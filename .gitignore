@@ -1,0 +1,26 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# ESP-IDF
+firmware/esp32/build/
+firmware/esp32/sdkconfig
+firmware/esp32/sdkconfig.old
+firmware/esp32/managed_components/
+
+# STM32CubeIDE
+firmware/stm32/**/Debug/
+firmware/stm32/**/Release/
+
+# App
+app/node_modules/
+app/.expo/
+app/android/
+app/ios/
+app/dist/
+*.apk
+*.aab
+*.ipa
+.env*
