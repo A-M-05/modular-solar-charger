@@ -2,7 +2,8 @@
 
 UCI EECS 159A/B senior design. Car sends live battery/solar data over Bluetooth to a phone app.
 
-```
+``` bash
+
 solar-rc-car/
 ├── firmware/
 │   ├── esp32/           ESP32-H4 code (C, ESP-IDF): reads sensors, sends data over Bluetooth
@@ -27,13 +28,15 @@ solar-rc-car/
 ★ = these three must always agree. Change one → change all three.
 
 ## Who works where
+
 | Team | Folder |
-|---|---|
+| --- | --- |
 | App / UI / stats | `app/` |
 | Bluetooth firmware | `firmware/esp32/main/ble_telemetry.c` |
 | Sensors / hardware | `firmware/esp32/main/sensors.c` (and `firmware/stm32/` if used) |
 
 ## Setup (one time)
+
 1. Install **VS Code**, **Git**, and **Node.js LTS**.
 2. Open this folder in VS Code → accept the "install recommended extensions" popup.
 3. ESP32: run **ESP-IDF: Configure ESP-IDF Extension** from the command palette (Ctrl/Cmd+Shift+P) → Express install.
@@ -41,8 +44,9 @@ solar-rc-car/
 5. Android: install **Android Studio** (for the SDK) and turn on USB debugging on your phone.
 
 ## Run the app
+
 | Goal | Command (inside `app/`) | Needs |
-|---|---|---|
+| --- | --- | --- |
 | Work on UI with fake data | `npm run start:mock` → scan QR with **Expo Go** | Just a phone |
 | Real Bluetooth, Android | `npm run android` (first time builds the app, ~5–10 min) then `npm start` | Android phone on USB |
 | Real Bluetooth, iPhone | `npm run ios` | Mac + Xcode; free Apple ID expires every 7 days |
@@ -50,10 +54,12 @@ solar-rc-car/
 Expo Go **cannot** use Bluetooth — leave "Mock data" on there.
 
 ## Run the firmware
+
 In VS Code, bottom status bar: set target **esp32h4** → select the USB port → **Build, Flash and Monitor** (flame icon).
 Then check it in the **nRF Connect** phone app: you should see `SolarRC` advertising.
 
 ## Bring-up order
+
 1. Flash ESP32 (fake data) → see `SolarRC` in nRF Connect, values changing.
 2. App with mock data → build the UI.
 3. App with real Bluetooth → same screen, real (fake) packets from the ESP32.
