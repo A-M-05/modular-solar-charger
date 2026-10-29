@@ -6,4 +6,3 @@
 
 void sensors_init(void);
 void sensors_read(telemetry_t *out);
-void sensors_set_mode(drive_mode_t mode);

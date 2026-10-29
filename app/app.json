@@ -1,16 +1,17 @@
 {
   "expo": {
-    "name": "Solar RC Dashboard",
-    "slug": "solar-rc-dashboard",
+    "name": "Solar Bank",
+    "slug": "solar-bank",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "edu.uci.solarrc",
+      "bundleIdentifier": "edu.uci.solarbank",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "Connects to the solar RC car to show live battery and solar data."
+        "NSBluetoothAlwaysUsageDescription": "Connects to your Solar Bank to show its battery level and solar charging.",
+        "NSLocationWhenInUseUsageDescription": "Uses your rough location to get the sun forecast for the suggested charge time."
       }
     },
     "android": {
@@ -21,7 +22,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "edu.uci.solarrc"
+      "package": "edu.uci.solarbank"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,9 +34,17 @@
         {
           "isBackgroundEnabled": false,
           "neverForLocation": true,
-          "bluetoothAlwaysPermission": "Connects to the solar RC car to show live battery and solar data."
+          "bluetoothAlwaysPermission": "Connects to your Solar Bank to show its battery level and solar charging."
+        }
+      ],
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Uses your rough location to get the sun forecast for the suggested charge time."
         }
       ]
-    ]
+    ],
+    "backgroundColor": "#f2f4f7"
   }
 }

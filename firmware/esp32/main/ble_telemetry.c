@@ -2,7 +2,7 @@
 //
 // Vocabulary:
 //   GATT server     = the ESP32 offers a "menu" of data
-//   service         = a folder on that menu (our "Car Telemetry" service)
+//   service         = a folder on that menu (our "Bank Telemetry" service)
 //   characteristic  = one data item in the folder
 //   notify          = ESP32 pushes new values to the phone without being asked
 #include "ble_telemetry.h"
@@ -31,7 +31,6 @@ static uint16_t s_conn = BLE_HS_CONN_HANDLE_NONE;
 static bool s_subscribed = false;
 static uint8_t s_own_addr_type;
 static telemetry_t s_last;
-static ble_mode_cb_t s_on_mode;
 
 static void advertise(void);
 
@@ -40,14 +39,8 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt 
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {          // phone reads telemetry once
         return os_mbuf_append(ctxt->om, &s_last, sizeof(s_last)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
-    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {         // phone sends a command
-        uint8_t mode;
-        uint16_t len;
-        if (ble_hs_mbuf_to_flat(ctxt->om, &mode, 1, &len) != 0 || len != 1 || mode > MODE_AUTO) {
-            return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-        }
-        ESP_LOGI(TAG, "mode command: %u", mode);
-        if (s_on_mode) s_on_mode((drive_mode_t)mode);
+    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {         // reserved: later toggles output ports
+        ESP_LOGI(TAG, "command ignored (%u bytes)", OS_MBUF_PKTLEN(ctxt->om));
         return 0;
     }
     return BLE_ATT_ERR_UNLIKELY;
@@ -104,7 +97,7 @@ static void advertise(void)
     f.name = (const uint8_t *)name;
     f.name_len = strlen(name);
     f.name_is_complete = 1;
-    f.uuids128 = &SVC_UUID;        // lets the app find the car by service UUID
+    f.uuids128 = &SVC_UUID;        // lets the app find the bank by service UUID
     f.num_uuids128 = 1;
     f.uuids128_is_complete = 1;
     int rc = ble_gap_adv_set_fields(&f);
@@ -132,9 +125,8 @@ static void host_task(void *arg)
     nimble_port_freertos_deinit();
 }
 
-void ble_telemetry_init(ble_mode_cb_t on_mode_command)
+void ble_telemetry_init(void)
 {
-    s_on_mode = on_mode_command;
     ESP_ERROR_CHECK(nimble_port_init());
     ble_hs_cfg.sync_cb = on_sync;
     ble_svc_gap_init();
