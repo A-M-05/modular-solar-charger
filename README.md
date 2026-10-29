@@ -52,9 +52,10 @@ modular-solar-charger/
 | Goal | Command (inside `app/`) | Needs |
 | --- | --- | --- |
 | Work on UI with fake data, in a browser | `npm run web` | Any laptop (Windows, Mac, Linux) |
-| Work on UI with fake data, on a phone | `npm run start:mock` → scan the QR code with **Expo Go** | Any iPhone or Android phone |
-| Real Bluetooth, Android | `npm run android` (builds a dev client, ~5–10 min the first time), then `npm start` | Android Studio (any OS), Android phone on USB |
-| Real Bluetooth, iPhone | `npm run ios` (builds a dev client), then `npm start` | Mac + Xcode, iPhone on USB; free Apple ID re-signs every 7 days |
+| Work on UI with fake data, on a phone | `npm start` → scan the QR code with **Expo Go** | Any iPhone or Android phone |
+| Work on UI with fake data, in the iOS Simulator | `npm start`, then press `i` | Mac with Xcode (including Simulator.app) |
+| Real Bluetooth, Android | `npm run android` (builds a dev client, ~5–10 min the first time), then `npm run start:dev` | Android Studio (any OS), Android phone on USB |
+| Real Bluetooth, iPhone | `npm run ios` (builds a dev client), then `npm run start:dev` | Mac + Xcode, iPhone on USB; free Apple ID re-signs every 7 days |
 | Typecheck + tests | `npm run typecheck && npm test` | — |
 
 Expo Go and the browser **cannot** use Bluetooth, so they run on mock data.

@@ -313,9 +313,10 @@ The app is glanced at often, and values update 5×/s, so motion stays **subtle a
 | Goal | How | Needs |
 | --- | --- | --- |
 | Build UI with mock data, in a browser | `npm run web` | Any laptop |
-| Build UI with mock data, on a phone | `npm run start:mock`, scan the QR code with **Expo Go** | Any iPhone or Android phone |
-| Real Bluetooth, Android | `npm run android` (builds a dev client), then `npm start` | Android Studio (any OS), Android phone on USB |
-| Real Bluetooth, iPhone | `npm run ios` (builds a dev client), then `npm start` | **Mac + Xcode**, iPhone on USB, free Apple ID (re-sign every 7 days) |
+| Build UI with mock data, on a phone | `npm start`, scan the QR code with **Expo Go** | Any iPhone or Android phone |
+| Build UI with mock data, in the iOS Simulator | `npm start`, then press `i` | Mac with Xcode (including Simulator.app) |
+| Real Bluetooth, Android | `npm run android` (builds a dev client), then `npm run start:dev` | Android Studio (any OS), Android phone on USB |
+| Real Bluetooth, iPhone | `npm run ios` (builds a dev client), then `npm run start:dev` | **Mac + Xcode**, iPhone on USB, free Apple ID (re-sign every 7 days) |
 
 Expo Go and the browser **cannot** use Bluetooth. Real BLE testing needs an Android phone (any computer) or an iPhone (Mac only). The Bluetooth permission text is already set in `app.json` via the `react-native-ble-plx` plugin.
 
