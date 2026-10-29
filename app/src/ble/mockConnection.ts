@@ -1,6 +1,7 @@
 // Fake power bank for building the UI without hardware (works in Expo Go and on a laptop).
 // The charging and draining scenarios reproduce the mockups in docs/ui/ exactly.
 import { BankConnection, Status } from './bankConnection';
+import { Sample } from '../protocol/stats';
 import { Telemetry } from '../protocol/telemetry';
 import { MAX_PANEL_W } from '../config';
 
@@ -31,11 +32,26 @@ const values: Record<Scenario, Partial<Telemetry>> = {
                 panelRatingW: 40, overRating: true, fastCharging: true },
 };
 
+/** Wall-clock time each scenario pretends it is, so the screen matches docs/ui/ (charging 2:14 PM, draining 8:05 PM). */
+export const MOCK_CLOCK: Record<Scenario, [number, number]> = {
+  charging: [14, 14], draining: [20, 5], balanced: [9, 30], stale: [14, 14], overRating: [13, 0],
+};
+
+// Light history every 30 min from 5:30 AM to 8:30 PM, traced from the chart in docs/ui/.
+// Both days cross 50 % at 10:40 AM and 3:40 PM, so the suggested window matches the mockups.
+const halfHours = (pcts: number[]): Sample[] => pcts.map((pct, i) => ({ min: 330 + i * 30, pct }));
+export const MOCK_HISTORY = {
+  yesterday: halfHours([0, 1, 2, 4, 7, 10, 15, 21, 28, 36, 46, 58, 68, 77, 84, 89, 88, 82, 74, 64, 54, 42, 32, 23, 16, 10, 6, 3, 1, 0, 0]),
+  today: halfHours([0, 1, 2, 4, 7, 10, 15, 21, 28, 36, 46, 58, 51, 83, 88, 90, 89, 76, 70, 66, 54, 42, 33, 25, 17, 11, 6, 3, 1, 0, 0]),
+};
+
 export function mockTelemetry(scenario: Scenario): Telemetry {
   return { ...base, ...values[scenario] };
 }
 
-const noise = (x: number) => x * (1 + (Math.random() - 0.5) * 0.04); // ±2 %
+// ±0.5 %: enough to see the smoothing work while the screen still reads the mockup's exact numbers
+// (the guide's ±2 % moves the first decimal and the finish time by a few minutes).
+const noise = (x: number) => x * (1 + (Math.random() - 0.5) * 0.01);
 
 export function createMockConnection(
   onTelemetry: (t: Telemetry) => void,
@@ -43,6 +59,7 @@ export function createMockConnection(
   scenario: Scenario,
 ): BankConnection {
   let timer: ReturnType<typeof setInterval> | null = null;
+  let first = true;
   const start = Date.now();
 
   return {
@@ -52,11 +69,14 @@ export function createMockConnection(
         const sec = (Date.now() - start) / 1000;
         if (scenario === 'stale' && sec > 5) return; // stays "connected" but goes quiet
         const t = mockTelemetry(scenario);
+        // First packet is exact: smoothing starts from it, so it sets what the screen settles on.
+        const n = first ? (x: number) => x : noise;
+        first = false;
         onTelemetry({
           ...t,
-          panelA: noise(t.panelA),
-          outA: noise(t.outA),
-          lightPct: Math.min(100, noise(t.lightPct)),
+          panelA: n(t.panelA),
+          outA: n(t.outA),
+          lightPct: Math.min(100, n(t.lightPct)),
           uptimeS: sec,
         });
       }, 200);

@@ -1,5 +1,7 @@
-import { MOCK_EFFICIENCY, mockTelemetry } from '../ble/mockConnection';
-import { addHours, computeStats, formatClock, formatDuration, socFromVoltage } from './stats';
+import { MOCK_EFFICIENCY, MOCK_HISTORY, mockTelemetry } from '../ble/mockConnection';
+import {
+  addHours, computeStats, formatClock, formatDuration, formatMinuteOfDay, socFromVoltage, strongWindow, suggestWindow,
+} from './stats';
 
 test('socFromVoltage: table endpoints and interpolation', () => {
   expect(socFromVoltage(9)).toBe(0);
@@ -7,6 +9,11 @@ test('socFromVoltage: table endpoints and interpolation', () => {
   expect(socFromVoltage(13.6)).toBe(1);
   expect(socFromVoltage(14)).toBe(1);
   expect(socFromVoltage(13.15)).toBeCloseTo(0.55);
+});
+
+test('formatDuration drops the hours under an hour', () => {
+  expect(formatDuration(0.52)).toBe('31 m');
+  expect(formatDuration(1)).toBe('1 h 0 m');
 });
 
 test('formatClock', () => {
@@ -55,4 +62,38 @@ test('balanced and fast-charging scenarios', () => {
 
 test('real efficiency (0.9) charges slower than the mockup', () => {
   expect(computeStats(mockTelemetry('charging')).pNet).toBeCloseTo(9.4 * 0.9 - 3.1);
+});
+
+describe('suggested charge time', () => {
+  const { today, yesterday } = MOCK_HISTORY;
+
+  test('strong window crosses 50 % at 10:40 AM and 3:40 PM', () => {
+    const w = strongWindow(yesterday)!;
+    expect(w.map(formatMinuteOfDay)).toEqual(['10:40 AM', '3:40 PM']);
+  });
+
+  test('charging mockup (2:14 PM): inside, 1 h 26 m left, based on yesterday', () => {
+    const now = 14 * 60 + 14;
+    const s = suggestWindow(now, today.filter((x) => x.min <= now), yesterday);
+    expect(s).toEqual({ kind: 'inside', start: 640, end: 940, source: 'yesterday' });
+    expect(formatDuration((940 - now) / 60)).toBe('1 h 26 m');
+  });
+
+  test('draining mockup (8:05 PM): after, tomorrow, based on today', () => {
+    expect(suggestWindow(20 * 60 + 5, today, yesterday)).toEqual({ kind: 'after', start: 640, end: 940, source: 'today' });
+  });
+
+  test('before the window', () => {
+    expect(suggestWindow(8 * 60, today.filter((x) => x.min <= 480), yesterday).kind).toBe('before');
+  });
+
+  test('no history', () => {
+    expect(suggestWindow(14 * 60, [], [])).toEqual({ kind: 'none' });
+    expect(strongWindow([{ min: 600, pct: 20 }])).toBeNull();
+  });
+
+  test('picks the longest run when clouds split the day', () => {
+    const s = [10, 60, 10, 60, 60, 60, 10].map((pct, i) => ({ min: i * 60, pct }));
+    expect(strongWindow(s)).toEqual([168, 312]);
+  });
 });

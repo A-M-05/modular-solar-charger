@@ -6,3 +6,4 @@ export const BATTERY_WH = 12.8 * 6; // 76.8 Wh
 export const MAX_PANEL_W = 30;
 export const FAST_CHARGE_W = 15;     // panel input at or above this = fast charging
 export const CHARGER_EFFICIENCY = 0.9; // until the hardware measures battery current directly
+export const STRONG_LIGHT_PCT = 50;    // light level that counts as "strong" for the suggested charge time

@@ -1,5 +1,5 @@
 // Derived statistics computed on the phone from raw telemetry (docs/SOLAR_BANK_APP_GUIDE.md §5).
-import { BATTERY_WH, CHARGER_EFFICIENCY, FAST_CHARGE_W } from '../config';
+import { BATTERY_WH, CHARGER_EFFICIENCY, FAST_CHARGE_W, STRONG_LIGHT_PCT } from '../config';
 import { Telemetry } from './telemetry';
 
 // Resting-voltage -> state-of-charge table for a 4S LiFePO4 pack.
@@ -72,12 +72,61 @@ export function formatClock(d: Date): string {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
-/** "4 h 38 m" */
+/** "4 h 38 m", or "31 m" under an hour */
 export function formatDuration(hours: number): string {
-  const totalMin = Math.floor(hours * 60);
-  return `${Math.floor(totalMin / 60)} h ${totalMin % 60} m`;
+  const totalMin = Math.floor(hours * 60 + 1e-6);
+  const h = Math.floor(totalMin / 60);
+  return h ? `${h} h ${totalMin % 60} m` : `${totalMin} m`;
 }
 
 export function addHours(d: Date, hours: number): Date {
   return new Date(d.getTime() + hours * 3_600_000);
 }
+
+// ---------- Suggested charge time (guide §5.5) ----------
+
+/** One light reading: minute of the day (0-1439) and % of full sun. */
+export interface Sample { min: number; pct: number }
+
+/** After this hour today counts as a "full day" of light history. */
+// ponytail: fixed cut-off; switch to "light has stayed ~0 for an hour" if it misbehaves in summer/winter
+const DAY_END_MIN = 18 * 60;
+
+/** Minute where the light crosses the threshold between two samples (linear interpolation). */
+const crossing = (a: Sample, b: Sample, threshold: number) =>
+  Math.round(a.min + ((threshold - a.pct) / (b.pct - a.pct)) * (b.min - a.min));
+
+/** Longest continuous run of samples at or above the threshold, as [startMin, endMin]. */
+export function strongWindow(samples: Sample[], threshold = STRONG_LIGHT_PCT): [number, number] | null {
+  let best: [number, number] | null = null;
+  let runStart = -1;
+  for (let i = 0; i <= samples.length; i++) {
+    const strong = i < samples.length && samples[i].pct >= threshold;
+    if (strong && runStart < 0) runStart = i;
+    if (!strong && runStart >= 0) {
+      const end = i - 1;
+      const startMin = runStart > 0 ? crossing(samples[runStart - 1], samples[runStart], threshold) : samples[runStart].min;
+      const endMin = i < samples.length ? crossing(samples[end], samples[i], threshold) : samples[end].min;
+      if (!best || endMin - startMin > best[1] - best[0]) best = [startMin, endMin];
+      runStart = -1;
+    }
+  }
+  return best;
+}
+
+export type Suggestion =
+  | { kind: 'none' }
+  | { kind: 'before' | 'inside' | 'after'; start: number; end: number; source: 'today' | 'yesterday' };
+
+/** Picks the most recent full day of light and says where "now" sits relative to its strong-light window. */
+export function suggestWindow(nowMin: number, today: Sample[], yesterday: Sample[]): Suggestion {
+  const source = nowMin >= DAY_END_MIN && today.length ? 'today' : 'yesterday';
+  const w = strongWindow(source === 'today' ? today : yesterday);
+  if (!w) return { kind: 'none' };
+  const [start, end] = w;
+  const kind = nowMin < start ? 'before' : nowMin < end ? 'inside' : 'after';
+  return { kind, start, end, source };
+}
+
+/** 640 -> "10:40 AM" */
+export const formatMinuteOfDay = (min: number) => formatClock(new Date(2000, 0, 1, 0, min));

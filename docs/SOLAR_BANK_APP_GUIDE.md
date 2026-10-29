@@ -1,6 +1,6 @@
 # Solar Bank App — Build Guide
 
-How to turn the current `app/` (built for an RC car) into the iOS app for the modular solar power bank, matching the UI mockups (Charging, Draining, Not connected).
+How to turn the current `app/` (built for an RC car) into the React Native app (iOS, Android, web) for the modular solar power bank, matching the UI mockups (Charging, Draining, Not connected).
 
 The microcontroller data isn't ready yet, so everything here runs on **mock data first** and switches to real BLE later with no UI changes.
 
@@ -45,7 +45,7 @@ Change these in **one place** (`src/config.ts`, see §4) once decided.
 | Light level | 0–100 % of full sun (MCU sends it) | Hardware |
 | "Strong light" for suggestions | ≥ 50 % | App team |
 | Charger efficiency | 0.90 (until battery current is measured directly) | Hardware |
-| Platform | iOS first (Android works too, untested) | — |
+| Platform | React Native (Expo): iOS, Android, and web. Web is mock-only (no Bluetooth), so teammates without a phone can work on the UI | Team |
 
 ---
 
@@ -281,7 +281,7 @@ Rewrite the mock to emit **v2 Telemetry objects**, with a scenario switch so you
 - `'draining'`: light 0 %, panel 0 W, out ~7.4 W
 - `'balanced'`, `'stale'` (stops emitting after 5 s), `'overRating'`
 
-Add small random noise (±2 %) so you can see the smoothing working. Keep the dev-only "Mock data" toggle, but move it out of the main UI: put it behind a long-press on the "Solar Bank" title, or show it only in `__DEV__`.
+Add small random noise (±0.5 %) so you can see the smoothing working. (±2 % moved the first decimal and the finish time by a few minutes, so the screen no longer matched the mockups.) Keep the dev-only "Mock data" toggle, but move it out of the main UI: put it behind a long-press on the "Solar Bank" title, or show it only in `__DEV__`.
 
 **Exercise:** make the mock's numbers reproduce the mockup values exactly. If your screen shows "Full by 6:52 PM" when the mock clock says 2:14 PM, your math matches the design.
 
@@ -308,14 +308,16 @@ The app is glanced at often, and values update 5×/s, so motion stays **subtle a
 
 ---
 
-## 11. Running on iOS
+## 11. Running the app
 
 | Goal | How | Needs |
 | --- | --- | --- |
-| Build UI with mock data | `npm run start:mock`, scan the QR code with **Expo Go** | Any iPhone |
-| Real Bluetooth | `npm run ios` (builds a dev client), then `npm start` | **Mac + Xcode**, iPhone on USB, free Apple ID (re-sign every 7 days) |
+| Build UI with mock data, in a browser | `npm run web` | Any laptop |
+| Build UI with mock data, on a phone | `npm run start:mock`, scan the QR code with **Expo Go** | Any iPhone or Android phone |
+| Real Bluetooth, Android | `npm run android` (builds a dev client), then `npm start` | Android Studio (any OS), Android phone on USB |
+| Real Bluetooth, iPhone | `npm run ios` (builds a dev client), then `npm start` | **Mac + Xcode**, iPhone on USB, free Apple ID (re-sign every 7 days) |
 
-Expo Go **cannot** use Bluetooth, so real BLE testing needs whoever on the team has a Mac. The Bluetooth permission text is already set in `app.json` via the `react-native-ble-plx` plugin.
+Expo Go and the browser **cannot** use Bluetooth. Real BLE testing needs an Android phone (any computer) or an iPhone (Mac only). The Bluetooth permission text is already set in `app.json` via the `react-native-ble-plx` plugin.
 
 ---
 
@@ -370,7 +372,7 @@ How to use them with Claude Code:
 | 7 | States: not connected, stale, error (§7) | Each state visible from mock |
 | 8 | Light history + suggestion card + chart (§5.5) | Window text updates correctly |
 | 9 | Motion + accessibility (§9–10) | VoiceOver reads every card |
-| 10 | Firmware v2 packet with fake data → real BLE on iPhone | Same screen, real packets |
+| 10 | Firmware v2 packet with fake data → real BLE on a phone | Same screen, real packets |
 | 11 | Hardware swaps fake sensor values for real readings | Live readings from the real bank |
 
 Steps 1–9 need no hardware at all.

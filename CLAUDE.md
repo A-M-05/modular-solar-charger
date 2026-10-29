@@ -1,6 +1,6 @@
 # Modular Solar Charger
 
-Solar power bank with swappable panels (UCI EECS 159A/B). An ESP32 sends battery, panel, and light data over BLE to an iOS app (React Native + Expo, in `app/`).
+Solar power bank with swappable panels (UCI EECS 159A/B). An ESP32 sends battery, panel, and light data over BLE to a React Native app (Expo, in `app/`) that runs on iOS, Android, and web (web is mock-only).
 
 ## Read first
 

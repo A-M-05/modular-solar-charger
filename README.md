@@ -1,6 +1,6 @@
 # Modular Solar Charger — Software
 
-UCI EECS 159A/B senior design. A solar power bank with swappable panels. An ESP32 sends live battery, panel, and light data over Bluetooth to an iOS app that answers: **"Is my power bank charging, and how long until it's full (or empty)?"**
+UCI EECS 159A/B senior design. A solar power bank with swappable panels. An ESP32 sends live battery, panel, and light data over Bluetooth to a React Native app (iOS, Android, and web) that answers: **"Is my power bank charging, and how long until it's full (or empty)?"**
 
 ```text
 modular-solar-charger/
@@ -18,7 +18,10 @@ modular-solar-charger/
 │       ├── protocol/stats.ts      battery %, watts, time-to-full math (+ tests)
 │       ├── ble/bankConnection.ts  real Bluetooth connection
 │       ├── ble/mockConnection.ts  fake power bank with scenarios, for building the UI with no hardware
-│       └── screens/Dashboard.tsx  interim main screen
+│       ├── hooks/useBank.ts       connection + smoothing + stale detection
+│       ├── components/            the cards on the screen
+│       ├── screens/Home.tsx       the main screen
+│       └── theme.ts               colours, fonts, sizes
 ├── docs/
 │   ├── protocol.md              ★ byte-by-byte description of the packet
 │   ├── SOLAR_BANK_APP_GUIDE.md  app spec: formulas, design, screen states, build order
@@ -48,11 +51,15 @@ modular-solar-charger/
 
 | Goal | Command (inside `app/`) | Needs |
 | --- | --- | --- |
-| Work on UI with fake data | `npm run start:mock` → scan QR with **Expo Go** | Any iPhone |
+| Work on UI with fake data, in a browser | `npm run web` | Any laptop (Windows, Mac, Linux) |
+| Work on UI with fake data, on a phone | `npm run start:mock` → scan the QR code with **Expo Go** | Any iPhone or Android phone |
+| Real Bluetooth, Android | `npm run android` (builds a dev client, ~5–10 min the first time), then `npm start` | Android Studio (any OS), Android phone on USB |
 | Real Bluetooth, iPhone | `npm run ios` (builds a dev client), then `npm start` | Mac + Xcode, iPhone on USB; free Apple ID re-signs every 7 days |
 | Typecheck + tests | `npm run typecheck && npm test` | — |
 
-Expo Go **cannot** use Bluetooth — leave "Mock data" on there. In dev builds, the mock has scenario buttons (charging, draining, balanced, stale, over rating).
+Expo Go and the browser **cannot** use Bluetooth, so they run on mock data.
+
+**Developer panel:** long-press the "Solar Bank" title. It switches between mock scenarios (charging, draining, balanced, stale, over rating), disconnects (to see the "Not connected" screen), and on phones toggles mock data off for real Bluetooth. The charging and draining scenarios reproduce `docs/ui/charging.png` and `draining.png` exactly.
 
 ## Run the firmware
 

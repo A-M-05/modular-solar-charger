@@ -21,5 +21,5 @@ export const space = { margin: 16, gap: 12, cardPad: 16 };
 export const font = { regular: 'Geist_400Regular', medium: 'Geist_500Medium', semibold: 'Geist_600SemiBold' };
 export const size = {
   headline: 28, battery: 30, flow: 20, kpi: 22, suggestion: 20,
-  appName: 17, body: 14, label: 13, small: 12, tick: 11,
+  appName: 17, button: 15, body: 14, label: 13, small: 12, tick: 11,
 };
