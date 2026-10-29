@@ -19,6 +19,7 @@ modular-solar-charger/
 │       ├── ble/bankConnection.ts  real Bluetooth connection
 │       ├── ble/mockConnection.ts  fake power bank with scenarios, for building the UI with no hardware
 │       ├── hooks/useBank.ts       connection + smoothing + stale detection
+│       ├── storage/lightHistory.ts  light readings saved every 30 min, for the suggested charge time
 │       ├── components/            the cards on the screen
 │       ├── screens/Home.tsx       the main screen
 │       └── theme.ts               colours, fonts, sizes

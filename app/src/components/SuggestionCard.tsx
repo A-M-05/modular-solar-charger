@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polyline, Rect } from 'react-native-svg';
 import { STRONG_LIGHT_PCT } from '../config';
-import { Sample, Suggestion, formatDuration, formatMinuteOfDay } from '../protocol/stats';
+import { MAX_GAP_MIN, Sample, Suggestion, formatDuration, formatMinuteOfDay } from '../protocol/stats';
 import { color, font, size } from '../theme';
 import { Card, Label } from './primitives';
 
@@ -12,6 +12,16 @@ const TICKS = [[360, '6 AM'], [720, '12 PM'], [1080, '6 PM']] as const;
 const CHART_H = 140;
 const PLOT_H = 114;                // the rest is x labels
 const GUTTER = 30;                 // y labels
+
+/** Splits a line where the history has a hole, so the chart doesn't draw light we never measured. */
+function segments(s: Sample[]): Sample[][] {
+  const out: Sample[][] = [];
+  s.forEach((p, i) => {
+    if (i === 0 || p.min - s[i - 1].min > MAX_GAP_MIN) out.push([]);
+    out[out.length - 1].push(p);
+  });
+  return out.filter((seg) => seg.length > 1);
+}
 
 function texts(s: Suggestion, nowMin: number): [string, string] {
   if (s.kind === 'none') return ['Not enough data yet.', 'Check back tomorrow.'];
@@ -73,8 +83,12 @@ export default function SuggestionCard({ suggestion, today, yesterday, nowMin }:
                     <Line key={v} x1={GUTTER} x2={width} y1={y(v)} y2={y(v)} stroke={color.control} strokeWidth={1}
                       strokeDasharray="2 4" />
                   ))}
-                  {showYesterday && <Polyline points={points(yesterday)} fill="none" stroke={color.idle} strokeWidth={2} />}
-                  {today.length > 1 && <Polyline points={points(today)} fill="none" stroke={color.accent} strokeWidth={2} />}
+                  {showYesterday && segments(yesterday).map((seg, i) => (
+                    <Polyline key={`y${i}`} points={points(seg)} fill="none" stroke={color.idle} strokeWidth={2} />
+                  ))}
+                  {segments(today).map((seg, i) => (
+                    <Polyline key={`t${i}`} points={points(seg)} fill="none" stroke={color.accent} strokeWidth={2} />
+                  ))}
                   {last && last.pct > 0 && <Circle cx={x(last.min)} cy={y(last.pct)} r={4} fill={color.accent} />}
                 </Svg>
                 {[100, 50, 0].map((v) => (

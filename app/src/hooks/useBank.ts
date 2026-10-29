@@ -4,12 +4,12 @@ import { Platform } from 'react-native';
 import { BankConnection, Status, createBankConnection } from '../ble/bankConnection';
 import { MOCK_CLOCK, MOCK_EFFICIENCY, MOCK_HISTORY, Scenario, createMockConnection } from '../ble/mockConnection';
 import { CHARGER_EFFICIENCY } from '../config';
-import { Sample, ema } from '../protocol/stats';
+import { ema } from '../protocol/stats';
 import { Telemetry } from '../protocol/telemetry';
+import { LightEntry, addSample, loadHistory, saveHistory, splitDays } from '../storage/lightHistory';
 
 const STALE_MS = 3000;
 const SMOOTHED = ['batteryV', 'panelV', 'panelA', 'outA', 'lightPct'] as const;
-const NO_HISTORY = { today: [] as Sample[], yesterday: [] as Sample[] };
 
 /** Web has no Bluetooth, so it always uses the mock. */
 export const MOCK_ONLY = Platform.OS === 'web';
@@ -25,6 +25,12 @@ export function useBank() {
   const smooth = useRef<Record<string, number | null>>({});
   const conn = useRef<BankConnection | null>(null);
   const connected = useRef(false);
+  const [lightLog, setLightLog] = useState<LightEntry[]>([]);
+  const lightLogRef = useRef<LightEntry[] | null>(null); // null until loaded, so we never overwrite saved history
+
+  useEffect(() => {
+    loadHistory().then((h) => { lightLogRef.current = h; setLightLog(h); });
+  }, []);
 
   // The mock pretends it's the time in the mockups; the clock still ticks from there.
   const clock = useRef<() => Date>(() => new Date());
@@ -50,6 +56,14 @@ export function useBank() {
       for (const k of SMOOTHED) s[k] = smooth.current[k] = ema(smooth.current[k] ?? null, x[k]);
       setTelemetry(s);
       setLastAt(clock.current());
+      if (!useMock && lightLogRef.current) {
+        const next = addSample(lightLogRef.current, s.lightPct, Date.now()); // every 30 min while connected
+        if (next !== lightLogRef.current) {
+          lightLogRef.current = next;
+          setLightLog(next);
+          saveHistory(next);
+        }
+      }
     };
     const onS = (s: Status, m?: string) => {
       connected.current = s === 'connected';
@@ -68,7 +82,9 @@ export function useBank() {
 
   const isConnected = status === 'connected';
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const history = useMock ? MOCK_HISTORY : NO_HISTORY; // ponytail: real history arrives with lightHistory.ts (build step 8)
+  const history = useMock
+    ? { today: MOCK_HISTORY.today.filter((x) => x.min <= nowMin), yesterday: MOCK_HISTORY.yesterday }
+    : splitDays(lightLog, now.getTime());
 
   return {
     status,
@@ -78,7 +94,7 @@ export function useBank() {
     now,
     stale: isConnected && lastAt !== null && now.getTime() - lastAt.getTime() > STALE_MS,
     efficiency: useMock ? MOCK_EFFICIENCY : CHARGER_EFFICIENCY,
-    history: { today: history.today.filter((x) => x.min <= nowMin), yesterday: history.yesterday },
+    history,
     connect: () => conn.current?.connect(),
     disconnect: () => { connected.current = false; return conn.current?.disconnect(); },
     mock: { useMock, setUseMock, scenario, setScenario },

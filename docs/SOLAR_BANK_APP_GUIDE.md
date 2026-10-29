@@ -196,7 +196,7 @@ Smooth V and I with the existing `ema()` (α = 0.2) **before** computing times, 
 ### 5.5 Suggested charge time
 
 1. Every 30 min while connected, save `{ time, light% }` to AsyncStorage (`lightHistory.ts`). Keep the last 2 days.
-2. Take the most recent **full day** of samples. Find the longest continuous run where light ≥ 50 %. That run is the window (e.g. 10:40 AM – 3:40 PM).
+2. Take the most recent **full day** of samples (today once it's past 6 PM, otherwise yesterday). Find the longest continuous run where light ≥ 50 %, interpolating where the light crosses 50 % between samples. That run is the window (e.g. 10:40 AM – 3:40 PM). Samples more than 60 min apart are a hole (the phone wasn't connected): the run stops there and the chart line breaks.
 3. Show the window based on the current time:
    - before the window → "Today, 10:40 AM – 3:40 PM"
    - inside it → "Now until 3:40 PM" + "1 h 26 m of strong light left"
