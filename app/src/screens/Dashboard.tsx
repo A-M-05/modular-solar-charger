@@ -6,6 +6,7 @@ import { MOCK_EFFICIENCY, SCENARIOS, Scenario, createMockConnection } from '../b
 import { CHARGER_EFFICIENCY, FAST_CHARGE_W } from '../config';
 import { addHours, computeStats, ema, formatClock, formatDuration } from '../protocol/stats';
 import { Telemetry } from '../protocol/telemetry';
+import { color, font, radius, size, space } from '../theme';
 
 const SMOOTHED = ['batteryV', 'panelV', 'panelA', 'outA'] as const;
 const countBits = (n: number) => n.toString(2).replace(/0/g, '').length;
@@ -40,20 +41,20 @@ export default function Dashboard() {
     : 'Holding steady';
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
       <Text style={styles.title}>Solar Bank</Text>
 
       {__DEV__ && (
         <>
           <View style={styles.row}>
-            <Text>Mock data</Text>
+            <Text style={styles.body}>Mock data</Text>
             <Switch value={useMock} onValueChange={setUseMock} disabled={connected} />
           </View>
           {useMock && (
             <View style={[styles.row, styles.wrap]}>
               {SCENARIOS.map((s) => (
                 <Pressable key={s} style={[styles.chip, scenario === s && styles.chipOn]} onPress={() => setScenario(s)}>
-                  <Text style={scenario === s ? styles.chipOnText : undefined}>{s}</Text>
+                  <Text style={[styles.body, scenario === s && styles.chipOnText]}>{s}</Text>
                 </Pressable>
               ))}
             </View>
@@ -104,21 +105,28 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 20, paddingTop: 60, gap: 12 },
-  title: { fontSize: 28, fontWeight: '700' },
-  headline: { fontSize: 24, fontWeight: '600' },
+  screen: { backgroundColor: color.ground },
+  page: { padding: space.margin, paddingTop: 60, gap: space.gap },
+  body: { fontFamily: font.regular, fontSize: size.body, color: color.text },
+  title: { fontFamily: font.semibold, fontSize: size.appName, color: color.text },
+  headline: { fontFamily: font.semibold, fontSize: size.headline, letterSpacing: -0.5, color: color.text },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   wrap: { flexWrap: 'wrap' },
-  button: { backgroundColor: '#1f6feb', padding: 14, borderRadius: 10, alignItems: 'center' },
-  buttonAlt: { backgroundColor: '#6e7781' },
-  buttonText: { color: 'white', fontWeight: '600' },
-  status: { color: '#6e7781' },
+  button: { backgroundColor: color.text, minHeight: 48, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' },
+  buttonAlt: { backgroundColor: color.muted },
+  buttonText: { fontFamily: font.medium, fontSize: size.body, color: color.surface },
+  status: { fontFamily: font.regular, fontSize: size.body, color: color.muted },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '48%', backgroundColor: '#f2f4f7', borderRadius: 12, padding: 14 },
-  tileLabel: { color: '#6e7781', fontSize: 13 },
-  tileValue: { fontSize: 24, fontWeight: '700', marginTop: 4, fontVariant: ['tabular-nums'] },
-  tileSub: { color: '#6e7781', marginTop: 2 },
-  chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#e4e7eb' },
-  chipOn: { backgroundColor: '#1f6feb' },
-  chipOnText: { color: 'white' },
+  tile: {
+    width: '48%', backgroundColor: color.surface, borderColor: color.border, borderWidth: 1,
+    borderRadius: radius.card, padding: space.cardPad,
+  },
+  tileLabel: { fontFamily: font.regular, fontSize: size.label, color: color.muted },
+  tileValue: {
+    fontFamily: font.medium, fontSize: size.kpi, color: color.text, marginTop: 4, fontVariant: ['tabular-nums'],
+  },
+  tileSub: { fontFamily: font.regular, fontSize: size.small, color: color.muted, marginTop: 2 },
+  chip: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: radius.control, backgroundColor: color.raised },
+  chipOn: { backgroundColor: color.text },
+  chipOnText: { color: color.surface },
 });

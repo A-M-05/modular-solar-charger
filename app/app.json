@@ -35,7 +35,8 @@
           "neverForLocation": true,
           "bluetoothAlwaysPermission": "Connects to your solar power bank to show live battery and solar data."
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }
