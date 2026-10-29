@@ -96,20 +96,28 @@ const DAY_END_MIN = 18 * 60;
 const crossing = (a: Sample, b: Sample, threshold: number) =>
   Math.round(a.min + ((threshold - a.pct) / (b.pct - a.pct)) * (b.min - a.min));
 
+/**
+ * Readings further apart than this are a hole in the history (the phone wasn't connected), not a
+ * continuous stretch: a strong-light run stops at the hole, and the chart line breaks there.
+ */
+export const MAX_GAP_MIN = 60;
+const near = (a: Sample, b: Sample) => b.min - a.min <= MAX_GAP_MIN;
+
 /** Longest continuous run of samples at or above the threshold, as [startMin, endMin]. */
 export function strongWindow(samples: Sample[], threshold = STRONG_LIGHT_PCT): [number, number] | null {
   let best: [number, number] | null = null;
-  let runStart = -1;
-  for (let i = 0; i <= samples.length; i++) {
-    const strong = i < samples.length && samples[i].pct >= threshold;
-    if (strong && runStart < 0) runStart = i;
-    if (!strong && runStart >= 0) {
-      const end = i - 1;
-      const startMin = runStart > 0 ? crossing(samples[runStart - 1], samples[runStart], threshold) : samples[runStart].min;
-      const endMin = i < samples.length ? crossing(samples[end], samples[i], threshold) : samples[end].min;
-      if (!best || endMin - startMin > best[1] - best[0]) best = [startMin, endMin];
-      runStart = -1;
-    }
+  let i = 0;
+  while (i < samples.length) {
+    if (samples[i].pct < threshold) { i++; continue; }
+    let j = i;
+    while (j + 1 < samples.length && samples[j + 1].pct >= threshold && near(samples[j], samples[j + 1])) j++;
+    // Interpolate the 50 % crossing from the weak neighbour, unless a hole separates them.
+    const before = samples[i - 1];
+    const after = samples[j + 1];
+    const start = before && near(before, samples[i]) ? crossing(before, samples[i], threshold) : samples[i].min;
+    const end = after && near(samples[j], after) ? crossing(samples[j], after, threshold) : samples[j].min;
+    if (end > start && (!best || end - start > best[1] - best[0])) best = [start, end];
+    i = j + 1;
   }
   return best;
 }

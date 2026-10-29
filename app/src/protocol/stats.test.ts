@@ -92,6 +92,17 @@ describe('suggested charge time', () => {
     expect(strongWindow([{ min: 600, pct: 20 }])).toBeNull();
   });
 
+  test('a hole in the history (phone not connected) ends the run', () => {
+    // strong at 10:00 and 14:00 with nothing recorded in between: not one 4-hour window
+    const s = [{ min: 570, pct: 20 }, { min: 600, pct: 70 }, { min: 630, pct: 70 }, { min: 840, pct: 70 }, { min: 870, pct: 20 }];
+    expect(strongWindow(s)).toEqual([588, 630]);
+  });
+
+  test('a single reading between holes is not a window', () => {
+    expect(strongWindow([{ min: 300, pct: 10 }, { min: 600, pct: 80 }, { min: 900, pct: 10 }])).toBeNull();
+    expect(suggestWindow(14 * 60, [], [{ min: 600, pct: 80 }])).toEqual({ kind: 'none' });
+  });
+
   test('picks the longest run when clouds split the day', () => {
     const s = [10, 60, 10, 60, 60, 60, 10].map((pct, i) => ({ min: i * 60, pct }));
     expect(strongWindow(s)).toEqual([168, 312]);
