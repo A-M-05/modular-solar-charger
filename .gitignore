@@ -24,3 +24,17 @@ app/dist/
 *.aab
 *.ipa
 .env*
+
+# Tests
+app/coverage/
+
+# Claude Code: personal/local files (shared skills in .claude/skills/ stay tracked)
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
+
+# Output from the design skills' scripts
+__pycache__/
+.taste-skill/
+motion-audits/
+design-system/

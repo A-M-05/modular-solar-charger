@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Solar RC Dashboard",
-    "slug": "solar-rc-dashboard",
+    "name": "Solar Bank",
+    "slug": "solar-bank",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "edu.uci.solarrc",
+      "bundleIdentifier": "edu.uci.solarbank",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "Connects to the solar RC car to show live battery and solar data."
+        "NSBluetoothAlwaysUsageDescription": "Connects to your solar power bank to show live battery and solar data."
       }
     },
     "android": {
@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "edu.uci.solarrc"
+      "package": "edu.uci.solarbank"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,7 +33,7 @@
         {
           "isBackgroundEnabled": false,
           "neverForLocation": true,
-          "bluetoothAlwaysPermission": "Connects to the solar RC car to show live battery and solar data."
+          "bluetoothAlwaysPermission": "Connects to your solar power bank to show live battery and solar data."
         }
       ]
     ]

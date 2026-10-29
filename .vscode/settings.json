@@ -5,5 +5,5 @@
   "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
   "files.associations": { "*.h": "c" },
   "idf.adapterTargetName": "esp32h4",
-  "cmake.sourceDirectory": "/Users/abrahammanu/Coding/modular-solar-charger/firmware/esp32"
+  "cmake.sourceDirectory": "${workspaceFolder}/firmware/esp32"
 }

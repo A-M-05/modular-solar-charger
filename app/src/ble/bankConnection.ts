@@ -1,23 +1,14 @@
-// Talks to the car over Bluetooth Low Energy (BLE).
+// Talks to the power bank over Bluetooth Low Energy (BLE).
 // Flow: ask permission -> scan for our service -> connect -> subscribe to telemetry notifications.
 import { PermissionsAndroid, Platform } from 'react-native';
 import type { BleManager, Device, Subscription } from 'react-native-ble-plx';
-import {
-  COMMAND_CHAR_UUID,
-  DriveMode,
-  SERVICE_UUID,
-  TELEMETRY_CHAR_UUID,
-  Telemetry,
-  decodeBase64Telemetry,
-  encodeModeCommand,
-} from '../protocol/telemetry';
+import { SERVICE_UUID, TELEMETRY_CHAR_UUID, Telemetry, decodeBase64Telemetry } from '../protocol/telemetry';
 
 export type Status = 'idle' | 'scanning' | 'connecting' | 'connected' | 'error';
 
-export interface CarConnection {
+export interface BankConnection {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
-  setMode(mode: DriveMode): Promise<void>;
 }
 
 let manager: BleManager | null = null;
@@ -43,10 +34,10 @@ async function requestPermissions(): Promise<boolean> {
   return r === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-export function createCarConnection(
+export function createBankConnection(
   onTelemetry: (t: Telemetry) => void,
   onStatus: (s: Status, msg?: string) => void,
-): CarConnection {
+): BankConnection {
   let device: Device | null = null;
   let sub: Subscription | null = null;
 
@@ -69,7 +60,7 @@ export function createCarConnection(
             const t = ch?.value ? decodeBase64Telemetry(ch.value) : null;
             if (t) onTelemetry(t);
           });
-          device.onDisconnected(() => onStatus('idle', 'Car disconnected'));
+          device.onDisconnected(() => onStatus('idle', 'Bank disconnected'));
           onStatus('connected');
         } catch (e: any) {
           onStatus('error', e?.message ?? 'Connection failed');
@@ -82,11 +73,6 @@ export function createCarConnection(
       await device?.cancelConnection().catch(() => {});
       device = null;
       onStatus('idle');
-    },
-    async setMode(mode) {
-      await device?.writeCharacteristicWithResponseForService(
-        SERVICE_UUID, COMMAND_CHAR_UUID, encodeModeCommand(mode),
-      );
     },
   };
 }

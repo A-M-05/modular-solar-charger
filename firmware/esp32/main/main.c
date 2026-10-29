@@ -21,14 +21,14 @@ void app_main(void)
     ESP_ERROR_CHECK(err);
 
     sensors_init();
-    ble_telemetry_init(sensors_set_mode);   // app's Manual/Auto buttons call sensors_set_mode()
+    ble_telemetry_init();
 
     telemetry_t pkt;
     while (1) {
         sensors_read(&pkt);
         bool sent = ble_telemetry_send(&pkt);
-        ESP_LOGD(TAG, "vbat=%umV panel=%dmA load=%dmA sent=%d",
-                 pkt.vbat_mV, pkt.ipanel_mA, pkt.iload_mA, sent);
+        ESP_LOGD(TAG, "vbat=%umV panel=%umV/%dmA out=%dmA sent=%d",
+                 pkt.vbat_mV, pkt.vpanel_mV, pkt.ipanel_mA, pkt.iout_mA, sent);
         vTaskDelay(pdMS_TO_TICKS(TELEMETRY_PERIOD_MS));
     }
 }

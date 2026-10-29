@@ -2,7 +2,7 @@
 //
 // Vocabulary:
 //   GATT server     = the ESP32 offers a "menu" of data
-//   service         = a folder on that menu (our "Car Telemetry" service)
+//   service         = a folder on that menu (our "Bank Telemetry" service)
 //   characteristic  = one data item in the folder
 //   notify          = ESP32 pushes new values to the phone without being asked
 #include "ble_telemetry.h"
@@ -20,18 +20,16 @@ static const char *TAG = "ble";
 // UUIDs must match app/src/protocol/telemetry.ts. BLE_UUID128_INIT takes bytes in REVERSE order.
 // Service   6e7a0001-5c1a-4f3b-9b2e-0a1b2c3d4e5f
 // Telemetry 6e7a0002-5c1a-4f3b-9b2e-0a1b2c3d4e5f (read + notify)
-// Command   6e7a0003-5c1a-4f3b-9b2e-0a1b2c3d4e5f (write)
+// 6e7a0003-... is reserved for a future phone -> bank command (e.g. toggling output ports).
 #define UUID_TAIL 0x5f, 0x4e, 0x3d, 0x2c, 0x1b, 0x0a, 0x2e, 0x9b, 0x3b, 0x4f, 0x1a, 0x5c
 static const ble_uuid128_t SVC_UUID = BLE_UUID128_INIT(UUID_TAIL, 0x01, 0x00, 0x7a, 0x6e);
 static const ble_uuid128_t TLM_UUID = BLE_UUID128_INIT(UUID_TAIL, 0x02, 0x00, 0x7a, 0x6e);
-static const ble_uuid128_t CMD_UUID = BLE_UUID128_INIT(UUID_TAIL, 0x03, 0x00, 0x7a, 0x6e);
 
 static uint16_t s_tlm_handle;
 static uint16_t s_conn = BLE_HS_CONN_HANDLE_NONE;
 static bool s_subscribed = false;
 static uint8_t s_own_addr_type;
 static telemetry_t s_last;
-static ble_mode_cb_t s_on_mode;
 
 static void advertise(void);
 
@@ -39,16 +37,6 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt 
 {
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {          // phone reads telemetry once
         return os_mbuf_append(ctxt->om, &s_last, sizeof(s_last)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
-    }
-    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {         // phone sends a command
-        uint8_t mode;
-        uint16_t len;
-        if (ble_hs_mbuf_to_flat(ctxt->om, &mode, 1, &len) != 0 || len != 1 || mode > MODE_AUTO) {
-            return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-        }
-        ESP_LOGI(TAG, "mode command: %u", mode);
-        if (s_on_mode) s_on_mode((drive_mode_t)mode);
-        return 0;
     }
     return BLE_ATT_ERR_UNLIKELY;
 }
@@ -60,7 +48,6 @@ static const struct ble_gatt_svc_def s_services[] = {
         .characteristics = (struct ble_gatt_chr_def[]) {
             { .uuid = &TLM_UUID.u, .access_cb = chr_access,
               .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY, .val_handle = &s_tlm_handle },
-            { .uuid = &CMD_UUID.u, .access_cb = chr_access, .flags = BLE_GATT_CHR_F_WRITE },
             { 0 },
         },
     },
@@ -104,7 +91,7 @@ static void advertise(void)
     f.name = (const uint8_t *)name;
     f.name_len = strlen(name);
     f.name_is_complete = 1;
-    f.uuids128 = &SVC_UUID;        // lets the app find the car by service UUID
+    f.uuids128 = &SVC_UUID;        // lets the app find the bank by service UUID
     f.num_uuids128 = 1;
     f.uuids128_is_complete = 1;
     int rc = ble_gap_adv_set_fields(&f);
@@ -132,9 +119,8 @@ static void host_task(void *arg)
     nimble_port_freertos_deinit();
 }
 
-void ble_telemetry_init(ble_mode_cb_t on_mode_command)
+void ble_telemetry_init(void)
 {
-    s_on_mode = on_mode_command;
     ESP_ERROR_CHECK(nimble_port_init());
     ble_hs_cfg.sync_cb = on_sync;
     ble_svc_gap_init();

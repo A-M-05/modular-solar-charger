@@ -5,42 +5,50 @@
 // Set to 0 once real sensors are wired up.
 #define USE_FAKE_DATA 1
 
-static drive_mode_t s_mode = MODE_MANUAL;
+#define MAX_RATING_W   30   // max panel rating the controller accepts
+#define FAST_CHARGE_MW 15000
 
 void sensors_init(void)
 {
     // TODO (hardware): set up the parts once the final list is known, e.g.
-    //   - ADC (adc_oneshot driver) for the battery voltage divider and the 4 light sensors
+    //   - ADC (adc_oneshot driver) for the battery/panel voltage dividers and the light sensor
     //   - I2C (i2c_master driver) for the INA219/INA226 current sensors
     //   - OR, if the STM32 does all sensing: a UART that receives telemetry_t from the STM32
-}
-
-void sensors_set_mode(drive_mode_t mode)
-{
-    s_mode = mode;
-    // TODO: tell the motor-control code (or the STM32) about the new mode
 }
 
 void sensors_read(telemetry_t *out)
 {
     uint32_t ms = (uint32_t)(esp_timer_get_time() / 1000);
-    out->version   = TELEMETRY_VERSION;
-    out->mode      = s_mode;
-    out->uptime_ms = ms;
+    out->version      = TELEMETRY_VERSION;
+    out->uptime_ms    = ms;
+    out->max_rating_W = MAX_RATING_W;
+    out->reserved     = 0;
 
 #if USE_FAKE_DATA
-    float t = ms / 1000.0f;
-    out->vbat_mV   = 7600 + (int)(300 * sinf(t / 30));
-    out->ipanel_mA = 300 + (int)(250 * sinf(t / 20));
-    out->iload_mA  = (s_mode == MODE_AUTO) ? 550 : 150;
-    for (int i = 0; i < 4; i++) {
-        out->light[i] = 2000 + (int)(1500 * sinf(t / 5 + i));
-    }
+    // A 20 W panel under slowly changing sun, 2 ports on.
+    float t   = ms / 1000.0f;
+    float sun = 0.5f + 0.5f * sinf(t / 20);
+    out->vbat_mV        = 13100 + (int)(100 * sinf(t / 30));
+    out->vpanel_mV      = sun > 0.05f ? 18800 : 0;
+    out->ipanel_mA      = (int16_t)(1000 * sun);
+    out->iout_mA        = 235;
+    out->light_permille = (uint16_t)(1000 * sun);
+    out->panel_rating_W = 20;
+    out->ports_on       = 0x03;
+    out->flags          = FLAG_PANEL;   // panel always plugged in
 #else
     // TODO (hardware): fill these from real readings
-    // vbat_mV   = adc_mV * (R1 + R2) / R2          (voltage divider)
-    // ipanel_mA = ina_read_current(PANEL_INA_ADDR)
-    // iload_mA  = ina_read_current(LOAD_INA_ADDR)
-    // light[i]  = adc_read(LIGHT_CH[i])
+    // vbat_mV        = adc_mV * (R1 + R2) / R2          (voltage divider)
+    // vpanel_mV      = same, on the panel input
+    // ipanel_mA      = ina_read_current(PANEL_INA_ADDR)
+    // iout_mA        = ina_read_current(OUT_INA_ADDR)
+    // light_permille = light sensor reading scaled to 0-1000 of full sun
+    // panel_rating_W = read from the swappable panel's ID (0 if unknown)
+    // ports_on       = which output ports are switched on
+    // flags          = FLAG_PANEL if a panel is plugged in
 #endif
+
+    uint32_t panel_mW = (uint32_t)out->vpanel_mV * (out->ipanel_mA > 0 ? out->ipanel_mA : 0) / 1000;
+    out->flags |= (panel_mW >= FAST_CHARGE_MW ? FLAG_FAST : 0)
+                | (out->panel_rating_W > MAX_RATING_W ? FLAG_OVER_RATING : 0);
 }

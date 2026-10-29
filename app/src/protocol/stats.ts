@@ -1,12 +1,12 @@
-// Derived statistics computed on the phone from raw telemetry.
+// Derived statistics computed on the phone from raw telemetry (docs/SOLAR_BANK_APP_GUIDE.md §5).
+import { BATTERY_WH, CHARGER_EFFICIENCY, FAST_CHARGE_W } from '../config';
 import { Telemetry } from './telemetry';
 
-// 2S LiPo (OVONIC 2200 mAh 7.4 V)
-export const PACK_WH = 2.2 * 7.4; // ≈ 16.3 Wh
-
-// Resting-voltage -> state-of-charge table for a 2S pack (approximate; tune with real data)
+// Resting-voltage -> state-of-charge table for a 4S LiFePO4 pack.
+// LiFePO4 is very flat between 20-90 %, so this jumps around; coulomb counting is the better fix later.
 const SOC_TABLE: [number, number][] = [
-  [6.6, 0], [7.2, 0.1], [7.4, 0.3], [7.6, 0.5], [7.8, 0.65], [8.0, 0.8], [8.2, 0.92], [8.4, 1],
+  [10.0, 0], [12.0, 0.09], [12.8, 0.17], [12.9, 0.2], [13.0, 0.3],
+  [13.1, 0.4], [13.2, 0.7], [13.3, 0.9], [13.4, 0.99], [13.6, 1],
 ];
 
 export function socFromVoltage(v: number): number {
@@ -21,30 +21,63 @@ export function socFromVoltage(v: number): number {
   return 1;
 }
 
+/** |P_net| below this counts as balanced, so the headline doesn't flicker. */
+const BALANCED_W = 0.1;
+
+export type FlowState = 'charging' | 'draining' | 'balanced';
+
 export interface Stats {
-  soc: number;         // 0-1
-  pIn: number;         // W from solar
-  pOut: number;        // W used
-  hoursToFull: number | null;  // null if not charging
-  hoursLeft: number | null;    // null if not draining
+  soc: number;                 // 0-1
+  eNowWh: number;              // energy in the battery now
+  pPanel: number;              // W from the panel
+  pOut: number;                // W to the output ports
+  pNet: number;                // W into (+) or out of (−) the battery
+  state: FlowState;
+  pctPerHour: number;          // pNet as % of capacity per hour (signed)
+  hoursToFull: number | null;  // null unless charging
+  hoursLeft: number | null;    // null unless draining
+  fastCharging: boolean;
 }
 
-export function computeStats(t: Telemetry): Stats {
+export function computeStats(t: Telemetry, eta = CHARGER_EFFICIENCY): Stats {
   const soc = socFromVoltage(t.batteryV);
-  const pIn = t.batteryV * t.panelA;   // P = V·I
-  const pOut = t.batteryV * t.loadA;
-  const net = pIn - pOut;
-  const eNow = soc * PACK_WH;
+  const eNowWh = soc * BATTERY_WH;
+  const pPanel = t.panelV * t.panelA;
+  const pOut = t.batteryV * t.outA;
+  const pNet = pPanel * eta - pOut;
+  const state: FlowState = pNet > BALANCED_W ? 'charging' : pNet < -BALANCED_W ? 'draining' : 'balanced';
   return {
     soc,
-    pIn,
+    eNowWh,
+    pPanel,
     pOut,
-    hoursToFull: net > 0.05 ? (PACK_WH - eNow) / net : null, // t_full = (E_max − E_now)/(P_in − P_out)
-    hoursLeft: net < -0.05 ? eNow / -net : null,              // t_left = E_now/(P_out − P_in)
+    pNet,
+    state,
+    pctPerHour: (pNet / BATTERY_WH) * 100,
+    hoursToFull: state === 'charging' ? (BATTERY_WH - eNowWh) / pNet : null, // (E_max − E_now) / P_net
+    hoursLeft: state === 'draining' ? eNowWh / -pNet : null,                 // E_now / (−P_net)
+    fastCharging: pPanel >= FAST_CHARGE_W,
   };
 }
 
 /** Exponential moving average for smoothing noisy readings: y = αx + (1−α)y */
 export function ema(prev: number | null, x: number, alpha = 0.2): number {
   return prev === null ? x : alpha * x + (1 - alpha) * prev;
+}
+
+/** "6:52 PM". Hand-rolled because Intl output varies by device (some use a narrow no-break space). */
+export function formatClock(d: Date): string {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** "4 h 38 m" */
+export function formatDuration(hours: number): string {
+  const totalMin = Math.floor(hours * 60);
+  return `${Math.floor(totalMin / 60)} h ${totalMin % 60} m`;
+}
+
+export function addHours(d: Date, hours: number): Date {
+  return new Date(d.getTime() + hours * 3_600_000);
 }
