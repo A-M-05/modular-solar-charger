@@ -40,14 +40,14 @@ function cells(t: Telemetry, s: Stats): Cell[] {
           sub: s.outW > config.idleW ? (s.state === 'balanced' ? 'Matches the panel' : 'Sun covers the output') : 'Nothing plugged in',
           a11y: 'Depletion rate, none',
         };
-  const light = Math.round(t.lightPct);
+  const light = Math.round(s.lightPct);
   return [
     charging,
     depletion,
-    { label: 'Light level', value: String(light), unit: '%', sub: 'of full sun', a11y: `Light level ${light} percent of full sun` },
+    { label: 'Light level', value: String(light), unit: '%', sub: 'estimated from the panel', a11y: `Light level about ${light} percent, estimated from the panel` },
     {
       label: 'Fast charging', value: s.fastCharging ? 'On' : 'Off',
-      sub: s.fastCharging ? `${config.fastChargeW} W or more in` : `Needs ${config.fastChargeW} W in`,
+      sub: s.fastCharging ? 'Reported by the bank' : 'Normal speed',
       a11y: `Fast charging ${s.fastCharging ? 'on' : 'off'}`,
     },
   ];

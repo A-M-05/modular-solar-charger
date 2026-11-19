@@ -9,14 +9,12 @@ export default function BatteryCard({
   soc,
   energyWh,
   capacityWh,
-  voltage,
   lastReadingAt,
   reduceMotion,
 }: {
   soc: number;
   energyWh: number;
   capacityWh: number;
-  voltage?: number;
   lastReadingAt?: string;   // set → greyed "Last reading 8:05 PM" version
   reduceMotion: boolean;
 }) {
@@ -30,7 +28,7 @@ export default function BatteryCard({
       <View style={styles.top}>
         <Label>Battery level</Label>
         <Small style={styles.right}>
-          {old ? `Last reading ${lastReadingAt}` : voltage !== undefined ? `${voltage.toFixed(1)} V` : ''}
+          {old ? `Last reading ${lastReadingAt}` : ''}
         </Small>
       </View>
       <Value value={String(pct)} unit="%" fontSize={size.battery} tint={old ? color.muted : color.text} />

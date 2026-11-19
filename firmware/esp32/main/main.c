@@ -1,4 +1,4 @@
-// Entry point: start Bluetooth, then read sensors and send telemetry 5x per second.
+// Entry point: start Bluetooth, then read sensors and send telemetry once per second.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -6,7 +6,7 @@
 #include "ble_telemetry.h"
 #include "sensors.h"
 
-#define TELEMETRY_PERIOD_MS 200   // 5 Hz
+#define TELEMETRY_PERIOD_MS 1000  // 1 Hz
 
 static const char *TAG = "main";
 
@@ -27,9 +27,9 @@ void app_main(void)
     while (1) {
         sensors_read(&pkt);
         bool sent = ble_telemetry_send(&pkt);
-        ESP_LOGD(TAG, "vbat=%umV vpanel=%umV ipanel=%dmA iout=%dmA light=%u flags=0x%02x sent=%d",
-                 pkt.vbat_mV, pkt.vpanel_mV, pkt.ipanel_mA, pkt.iout_mA, pkt.light_permille,
-                 pkt.flags, sent);
+        ESP_LOGD(TAG, "seq=%u panel=%umV/%umA device=%umV/%umA soc=%u%% flags=0x%02x crc=0x%04x sent=%d",
+                 pkt.seq, pkt.panel_mV, pkt.panel_mA, pkt.device_mV, pkt.device_mA, pkt.soc_pct,
+                 pkt.flags, pkt.crc, sent);
         vTaskDelay(pdMS_TO_TICKS(TELEMETRY_PERIOD_MS));
     }
 }

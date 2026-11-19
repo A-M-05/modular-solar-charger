@@ -6,23 +6,10 @@ import { Telemetry } from './telemetry';
 // ---------------------------------------------------------------------------------------------
 // Battery level (§5.2)
 
-// Resting-voltage -> state-of-charge table for 4S LiFePO4.
-// ⚠ Very flat between 20–90 %, so this jumps around. Better later: coulomb counting.
-const SOC_TABLE: [number, number][] = [
-  [10.0, 0], [12.0, 0.09], [12.8, 0.17], [12.9, 0.2], [13.0, 0.3],
-  [13.1, 0.4], [13.2, 0.7], [13.3, 0.9], [13.4, 0.99], [13.6, 1],
-];
-
-export function socFromVoltage(v: number): number {
-  if (v <= SOC_TABLE[0][0]) return 0;
-  for (let i = 1; i < SOC_TABLE.length; i++) {
-    const [v1, s1] = SOC_TABLE[i];
-    if (v <= v1) {
-      const [v0, s0] = SOC_TABLE[i - 1];
-      return s0 + ((v - v0) / (v1 - v0)) * (s1 - s0);
-    }
-  }
-  return 1;
+/** Light level estimate (the packet has no light sensor): P_panel / panel rating × 100, capped at 100. */
+export function estimateLightPct(t: Telemetry, cfg: Config = defaultConfig): number {
+  const w = Math.max(0, t.panelV * t.panelA);
+  return Math.min(100, (w / cfg.panelRatedW) * 100);
 }
 
 /** Exponential moving average for smoothing noisy readings: y = αx + (1−α)y */
@@ -47,14 +34,16 @@ export interface Stats {
   hoursLeft: number | null;        // null unless draining
   pctPerHour: number;              // |P_net| / capacity · 100
   fastCharging: boolean;
+  full: boolean;                   // done-charging flag, or 100 %
+  lightPct: number;                // estimated, 0-100
 }
 
 export function computeStats(t: Telemetry, cfg: Config = defaultConfig): Stats {
-  const soc = socFromVoltage(t.batteryV);
+  const soc = Math.min(1, Math.max(0, t.socPct / 100));
   const capacityWh = cfg.batteryWh;
   const energyWh = soc * capacityWh;
   const panelW = Math.max(0, t.panelV * t.panelA);
-  const outW = Math.max(0, t.batteryV * t.outA);
+  const outW = Math.max(0, t.deviceV * t.deviceA);
   const netW = panelW * cfg.efficiency - outW;
   const state: FlowState =
     netW > cfg.balancedW ? 'charging' : netW < -cfg.balancedW ? 'draining' : 'balanced';
@@ -69,7 +58,9 @@ export function computeStats(t: Telemetry, cfg: Config = defaultConfig): Stats {
     hoursToFull: state === 'charging' ? (capacityWh - energyWh) / netW : null,
     hoursLeft: state === 'draining' ? energyWh / -netW : null,
     pctPerHour: (Math.abs(netW) / capacityWh) * 100,
-    fastCharging: t.fastCharging || panelW >= cfg.fastChargeW,
+    fastCharging: t.fastCharging,
+    full: t.doneCharging || soc >= 0.995,
+    lightPct: estimateLightPct(t, cfg),
   };
 }
 
@@ -122,7 +113,7 @@ export interface Headline {
 export function headline(s: Stats, now: Date): Headline {
   const w = formatNumber(Math.abs(s.netW));
   if (s.state === 'charging') {
-    if (s.soc >= 0.995) return { title: 'Fully charged', subline: 'The panel is covering the output' };
+    if (s.full) return { title: 'Fully charged', subline: 'The panel is covering the output' };
     const min = s.hoursToFull! * 60;
     return {
       title: `Full by ${formatEta(now, min)}`,

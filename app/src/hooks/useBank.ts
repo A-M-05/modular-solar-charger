@@ -5,7 +5,7 @@ import { BankConnection, Status, bleAvailable, createBankConnection } from '../b
 import { Scenario, createMockConnection, mockLightHistory } from '../ble/mockConnection';
 import { config } from '../config';
 import { LightSample, computeStats, ema } from '../protocol/stats';
-import { Telemetry } from '../protocol/telemetry';
+import { Telemetry, droppedBetween } from '../protocol/telemetry';
 import {
   LastReading,
   loadLastReading,
@@ -15,7 +15,7 @@ import {
   saveLightHistory,
 } from '../storage/lightHistory';
 
-const SMOOTHED = ['batteryV', 'panelV', 'panelA', 'outA', 'lightPct'] as const;
+const SMOOTHED = ['panelV', 'panelA', 'deviceV', 'deviceA', 'socPct'] as const;
 
 export interface Bank {
   status: Status;
@@ -26,6 +26,7 @@ export interface Bank {
   now: number;                  // bank clock (the mock runs its own)
   history: LightSample[];
   lastReading: LastReading | null;
+  dropped: number;              // packets lost this connection (from the packet IDs)
   connect(): void;
   disconnect(): void;
   // Dev-only
@@ -50,6 +51,7 @@ export function useBank(): Bank {
   const [stale, setStale] = useState(false);
   const [history, setHistory] = useState<LightSample[]>([]);
   const [lastReading, setLastReading] = useState<LastReading | null>(null);
+  const [dropped, setDropped] = useState(0);
 
   const conn = useRef<BankConnection | null>(null);
   const smooth = useRef<Partial<Record<(typeof SMOOTHED)[number], number>>>({});
@@ -57,6 +59,7 @@ export function useBank(): Bank {
   const lastSavedReading = useRef(0);
   const historyRef = useRef<LightSample[]>([]);
   const readingRef = useRef<LastReading | null>(null);
+  const lastSeq = useRef<number | null>(null);
 
   // Real mode keeps its history on the phone; mock mode makes up two days in memory.
   useEffect(() => {
@@ -67,6 +70,8 @@ export function useBank(): Bank {
 
   useEffect(() => {
     smooth.current = {};
+    lastSeq.current = null;
+    setDropped(0);
     setTelemetry(null);
     setLastPacketAt(null);
     setStale(false);
@@ -74,6 +79,11 @@ export function useBank(): Bank {
     const onTelemetry = (raw: Telemetry) => {
       const c = conn.current!;
       const t = { ...raw };
+      if (lastSeq.current !== null) {
+        const lost = droppedBetween(lastSeq.current, raw.seq);
+        if (lost) setDropped((d) => d + lost);
+      }
+      lastSeq.current = raw.seq;
       for (const k of SMOOTHED) t[k] = smooth.current[k] = ema(smooth.current[k] ?? null, raw[k]);
       const clock = c.now();
       lastPacketReal.current = Date.now();
@@ -82,17 +92,18 @@ export function useBank(): Bank {
       setNow(clock);
       setStale(false);
 
+      const s = computeStats(t);
+
       // Light sample every 30 min (of bank clock)
       const h = historyRef.current;
       if (!h.length || clock - h[h.length - 1].t >= config.lightSampleEveryMin * 60_000) {
-        const next = prune([...h, { t: clock, pct: t.lightPct }], clock);
+        const next = prune([...h, { t: clock, pct: s.lightPct }], clock);
         historyRef.current = next;
         setHistory(next);
         if (!mock) saveLightHistory(next);
       }
 
       // Remember the battery level for the "Not connected" screen
-      const s = computeStats(t);
       readingRef.current = { t: clock, soc: s.soc, energyWh: s.energyWh };
       if (!mock && Date.now() - lastSavedReading.current > 10_000) {
         lastSavedReading.current = Date.now();
@@ -156,6 +167,7 @@ export function useBank(): Bank {
     now,
     history,
     lastReading,
+    dropped,
     connect,
     disconnect,
     mock,

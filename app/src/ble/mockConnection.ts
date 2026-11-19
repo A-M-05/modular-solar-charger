@@ -5,47 +5,34 @@ import { BankConnection, Status } from './bankConnection';
 import { LightSample } from '../protocol/stats';
 import { Telemetry } from '../protocol/telemetry';
 
-export type Scenario = 'charging' | 'draining' | 'balanced' | 'stale' | 'overRating';
-export const SCENARIOS: Scenario[] = ['charging', 'draining', 'balanced', 'stale', 'overRating'];
+export type Scenario = 'charging' | 'draining' | 'balanced' | 'stale' | 'pdFailure';
+export const SCENARIOS: Scenario[] = ['charging', 'draining', 'balanced', 'stale', 'pdFailure'];
 
 interface ScenarioSpec {
   clock: [number, number];  // hour, minute the mock clock starts at
-  batteryV: number;
+  socPct: number;
   panelV: number;
   panelW: number;
+  deviceV: number;
   outW: number;
-  lightPct: number;
-  panelRatingW: number;
-  portsOn: number;
+  fast?: boolean;
+  pdFailure?: boolean;
   stopAfterS?: number;      // stop emitting (to test the stale state)
 }
 
-// 13.1733 V → 62 % and 13.1467 V → 54 % on the LiFePO4 table (both display as in the mockups).
+// Battery % values match the mockups (62 % charging, 54 % draining).
 const SPECS: Record<Scenario, ScenarioSpec> = {
-  charging: {
-    clock: [14, 14], batteryV: 13.1 + 0.22 / 3, panelV: 18, panelW: 9.4, outW: 3.1,
-    lightPct: 71, panelRatingW: 20, portsOn: 0b011,
-  },
-  draining: {
-    clock: [20, 5], batteryV: 13.1 + 0.14 / 3, panelV: 0, panelW: 0, outW: 7.4,
-    lightPct: 0, panelRatingW: 20, portsOn: 0b111,
-  },
-  balanced: {
-    clock: [16, 20], batteryV: 13.2, panelV: 17, panelW: 4.5, outW: 4.05,
-    lightPct: 34, panelRatingW: 20, portsOn: 0b001,
-  },
-  stale: {
-    clock: [14, 14], batteryV: 13.1 + 0.22 / 3, panelV: 18, panelW: 9.4, outW: 3.1,
-    lightPct: 71, panelRatingW: 20, portsOn: 0b011, stopAfterS: 5,
-  },
-  overRating: {
-    clock: [12, 40], batteryV: 13.25, panelV: 20, panelW: 22, outW: 2,
-    lightPct: 88, panelRatingW: 40, portsOn: 0b001,
+  charging: { clock: [14, 14], socPct: 62, panelV: 18, panelW: 9.4, deviceV: 5, outW: 3.1 },
+  draining: { clock: [20, 5], socPct: 54, panelV: 0, panelW: 0, deviceV: 5, outW: 7.4 },
+  balanced: { clock: [16, 20], socPct: 70, panelV: 17, panelW: 4.5, deviceV: 5, outW: 4.05 },
+  stale: { clock: [14, 14], socPct: 62, panelV: 18, panelW: 9.4, deviceV: 5, outW: 3.1, stopAfterS: 5 },
+  pdFailure: {
+    clock: [12, 40], socPct: 80, panelV: 18, panelW: 16, deviceV: 5, outW: 2.5, fast: true, pdFailure: true,
   },
 };
 
-const MAX_RATING_W = 30;
-const FAST_W = 15;
+const LOW_BATTERY_PCT = 20;
+const PACKET_INTERVAL_MS = 1000; // the bank sends once per second
 
 /** ±pct random noise, so the smoothing has something to do. */
 const jitter = (x: number, pct = 2) => x * (1 + ((Math.random() * 2 - 1) * pct) / 100);
@@ -57,6 +44,7 @@ export function createMockConnection(
   onStatus: (s: Status, msg?: string) => void,
 ): BankConnection {
   let timer: ReturnType<typeof setInterval> | null = null;
+  let seq = 0;
   const spec = SPECS[scenario];
   const noisy = (x: number) => (noise ? jitter(x) : x);
   const realStart = Date.now();
@@ -70,27 +58,27 @@ export function createMockConnection(
       await new Promise((r) => setTimeout(r, 600));
       onStatus('connected');
       const connectedAt = Date.now();
-      timer = setInterval(() => {
+      const emit = () => {
         const sec = (Date.now() - connectedAt) / 1000;
         if (spec.stopAfterS && sec > spec.stopAfterS) return;
         const panelW = noisy(spec.panelW);
         const outW = noisy(spec.outW);
-        const batteryV = spec.batteryV + (noise ? (Math.random() - 0.5) * 0.001 : 0); // ±0.5 mV (SoC is very sensitive to V)
         onTelemetry({
-          batteryV,
+          seq: seq++ % 256,
           panelV: spec.panelV,
           panelA: spec.panelV > 0 ? panelW / spec.panelV : 0,
-          outA: outW / batteryV,
-          lightPct: Math.min(100, noisy(spec.lightPct)),
-          panelConnected: true,
-          fastCharging: panelW >= FAST_W,
-          overRating: spec.panelRatingW > MAX_RATING_W,
-          panelRatingW: spec.panelRatingW,
-          maxRatingW: MAX_RATING_W,
-          portsOn: spec.portsOn,
-          uptimeS: sec,
+          deviceV: spec.deviceV,
+          deviceA: outW / spec.deviceV,
+          socPct: spec.socPct,
+          fastCharging: !!spec.fast,
+          doneCharging: spec.socPct >= 100,
+          charging: panelW > 0,
+          lowBattery: spec.socPct <= LOW_BATTERY_PCT,
+          pdFailure: !!spec.pdFailure,
         });
-      }, 200);
+      };
+      emit(); // first packet right away instead of after a 1 s wait
+      timer = setInterval(emit, PACKET_INTERVAL_MS);
     },
     async disconnect() {
       if (timer) clearInterval(timer);
@@ -124,7 +112,7 @@ export function mockLightHistory(nowMs: number): LightSample[] {
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const round = (x: number) => Math.round(x * 10) / 10; // same precision as the packet
+  const round = (x: number) => Math.round(x * 10) / 10;
   for (let m = 5 * 60; m <= 21 * 60; m += 10) {
     const y = new Date(yesterday);
     y.setHours(0, m, 0, 0);

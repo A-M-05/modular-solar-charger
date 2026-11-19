@@ -13,7 +13,7 @@ modular-solar-charger/
 ├── firmware/
 │   └── esp32/           ESP32-H4 code (C, ESP-IDF): reads sensors, sends data over Bluetooth
 │       └── main/
-│           ├── main.c            starts everything, sends data 5x/second
+│           ├── main.c            starts everything, sends data once per second
 │           ├── telemetry.h       ★ the data packet (must match the app)
 │           ├── sensors.c/.h      sensor readings — FAKE data for now, TODOs for hardware
 │           └── ble_telemetry.c/.h  Bluetooth server
@@ -68,7 +68,7 @@ Everything below runs inside `app/`.
 Expo Go **cannot** use Bluetooth. Without the BLE module (Expo Go, web) the app runs on mock data automatically.
 
 **Dev menu:** long-press the "Solar Bank" title to switch mock data on/off, pick a scenario
-(`charging`, `draining`, `balanced`, `stale`, `overRating`), or disconnect to see the "Not connected" screen.
+(`charging`, `draining`, `balanced`, `stale`, `pdFailure`), or disconnect to see the "Not connected" screen. When connected it also shows **dropped packets**.
 Each scenario sets the mock clock to the mockup's time (e.g. charging starts at 2:14 PM).
 
 **Suggested charge time** comes from the free [Open-Meteo](https://open-meteo.com) solar forecast

@@ -1,33 +1,29 @@
-// Panel → Battery → Devices. Shows off the swappable panel: its rating against the max rating.
+// Panel → Battery → Devices, plus warnings from the bank's flags.
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Line, Polyline } from 'react-native-svg';
 import { config } from '../config';
 import { Stats, formatNumber } from '../protocol/stats';
-import { Telemetry, countPorts } from '../protocol/telemetry';
+import { Telemetry } from '../protocol/telemetry';
 import { color, font, size } from '../theme';
 import { Card, Label, Small, Value } from './ui';
 
-function portsText(mask: number): string {
-  const n = countPorts(mask);
-  return n === 0 ? 'All ports off' : n === 1 ? '1 port on' : `${n} ports on`;
-}
-
 export default function PowerFlow({ t, s }: { t: Telemetry; s: Stats }) {
-  const max = t.maxRatingW || config.maxPanelW;
-  const panelSub = !t.panelConnected
-    ? 'No panel'
-    : t.panelRatingW
-      ? `${t.panelRatingW} W · max ${max}`
-      : `max ${max} W`;
   const sunIn = s.panelW > config.idleW;
   const out = s.outW > config.idleW;
+  const panelSub = t.charging || sunIn ? `${config.panelRatedW} W panel` : 'No panel';
+  const deviceSub = out ? `${formatNumber(t.deviceV)} V · ${formatNumber(t.deviceA, 2)} A` : 'Nothing plugged in';
   const batteryWord = s.state === 'balanced' ? 'steady' : s.state;
   const net = s.state === 'balanced' ? 0 : s.netW;
+
+  const notices: string[] = [];
+  if (t.pdFailure) notices.push('Fast-charge handshake with your device failed. Try another cable.');
+  if (t.lowBattery) notices.push('Battery low. Put the panel in the sun.');
 
   const a11y =
     `Panel ${formatNumber(s.panelW)} watts in, ${panelSub}. ` +
     `Battery ${s.state} at ${formatNumber(Math.abs(net))} watts. ` +
-    `Devices ${formatNumber(s.outW)} watts, ${portsText(t.portsOn)}.`;
+    `Devices ${formatNumber(s.outW)} watts, ${deviceSub}. ` +
+    notices.join(' ');
 
   return (
     <Card accessible accessibilityLabel={a11y}>
@@ -36,11 +32,11 @@ export default function PowerFlow({ t, s }: { t: Telemetry; s: Stats }) {
         <Arrow on={sunIn} stroke={color.accent} />
         <Column label="Battery" value={formatNumber(net, 1, true)} sub={batteryWord} />
         <Arrow on={out} stroke={color.text} />
-        <Column label="Devices" value={formatNumber(s.outW)} sub={portsText(t.portsOn)} />
+        <Column label="Devices" value={formatNumber(s.outW)} sub={deviceSub} />
       </View>
-      {t.overRating && (
-        <Text style={styles.notice}>{`This panel is above the ${max} W limit`}</Text>
-      )}
+      {notices.map((n) => (
+        <Text key={n} style={styles.notice}>{n}</Text>
+      ))}
     </Card>
   );
 }

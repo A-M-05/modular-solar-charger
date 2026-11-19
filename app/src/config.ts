@@ -4,10 +4,9 @@
 export const config = {
   // 4S LiFePO4, 12.8 V nominal, 6 Ah
   batteryWh: 76.8,
-  // Max panel rating the controller accepts (W). The bank also reports it, this is the fallback.
-  maxPanelW: 30,
-  // Panel input at or above this counts as fast charging (W)
-  fastChargeW: 15,
+  // Rated power of the attached panel (W). Used to estimate the light level, since the
+  // packet has no light sensor: light % ≈ P_panel / panelRatedW × 100
+  panelRatedW: 20,
   // Charger efficiency, used until the hardware measures battery current directly
   efficiency: 0.9,
   // |P_net| below this is shown as "Holding steady" (W)
@@ -32,9 +31,10 @@ export const config = {
   minSamplesPerDay: 8,
   // How often to save a light sample while connected (minutes)
   lightSampleEveryMin: 30,
-  // Smoothing factor for V, I and light readings: y = αx + (1−α)y
-  emaAlpha: 0.2,
-  // No packet for this long while connected → "stale" (ms)
+  // Smoothing factor for V, I and battery % readings: y = αx + (1−α)y.
+  // Lag ≈ packet interval / α = 1 s / 0.5 ≈ 2 s at 1 packet per second
+  emaAlpha: 0.5,
+  // No packet for this long while connected → "stale" (ms). 3 missed packets at 1 Hz
   staleAfterMs: 3000,
   // Give up scanning after this long (ms)
   scanTimeoutMs: 15000,

@@ -4,10 +4,10 @@ import {
   LightSample,
   computeStats,
   formatClock,
+  estimateLightPct,
   formatDuration,
   headline,
   longestStrongRun,
-  socFromVoltage,
   suggestWindow,
   suggestionText,
 } from '../stats';
@@ -22,47 +22,36 @@ const at = (h: number, m: number, dayOffset = 0) => {
   return d;
 };
 
-function telemetry(batteryV: number, panelW: number, outW: number, lightPct: number): Telemetry {
+function telemetry(socPct: number, panelW: number, outW: number, flags: Partial<Telemetry> = {}): Telemetry {
   return {
-    batteryV,
+    seq: 0,
     panelV: panelW > 0 ? 18 : 0,
     panelA: panelW > 0 ? panelW / 18 : 0,
-    outA: outW / batteryV,
-    lightPct,
-    panelConnected: true,
+    deviceV: 5,
+    deviceA: outW / 5,
+    socPct,
     fastCharging: false,
-    overRating: false,
-    panelRatingW: 20,
-    maxRatingW: 30,
-    portsOn: 3,
-    uptimeS: 0,
+    doneCharging: false,
+    charging: panelW > 0,
+    lowBattery: false,
+    pdFailure: false,
+    ...flags,
   };
 }
 
-// 62 % and 54 % on the LiFePO4 table; both display as 13.2 V / 13.1 V like the mockups.
-const V62 = 13.1 + 0.22 / 3;
-const V54 = 13.1 + 0.14 / 3;
-
-describe('socFromVoltage', () => {
-  it('clamps at the table ends', () => {
-    expect(socFromVoltage(9)).toBe(0);
-    expect(socFromVoltage(10)).toBe(0);
-    expect(socFromVoltage(13.6)).toBe(1);
-    expect(socFromVoltage(14.2)).toBe(1);
+describe('estimateLightPct', () => {
+  it('is panel watts over the panel rating', () => {
+    expect(estimateLightPct(telemetry(50, 10, 0), { ...config, panelRatedW: 20 })).toBeCloseTo(50);
+    expect(estimateLightPct(telemetry(50, 0, 0))).toBe(0);
   });
-  it('hits table points', () => {
-    expect(socFromVoltage(12.8)).toBeCloseTo(0.17);
-    expect(socFromVoltage(13.2)).toBeCloseTo(0.7);
-  });
-  it('interpolates between points', () => {
-    expect(socFromVoltage(13.15)).toBeCloseTo(0.55);
-    expect(socFromVoltage(V62)).toBeCloseTo(0.62);
+  it('caps at 100 %', () => {
+    expect(estimateLightPct(telemetry(50, 30, 0), { ...config, panelRatedW: 20 })).toBe(100);
   });
 });
 
 describe('computeStats + headline', () => {
   it('reproduces the Charging mockup', () => {
-    const s = computeStats(telemetry(V62, 9.4, 3.1, 71), lossless);
+    const s = computeStats(telemetry(62, 9.4, 3.1), lossless);
     expect(s.state).toBe('charging');
     expect(s.panelW).toBeCloseTo(9.4);
     expect(s.netW).toBeCloseTo(6.3);
@@ -76,7 +65,7 @@ describe('computeStats + headline', () => {
   });
 
   it('reproduces the Draining mockup', () => {
-    const s = computeStats(telemetry(V54, 0, 7.4, 0), lossless);
+    const s = computeStats(telemetry(54, 0, 7.4), lossless);
     expect(s.state).toBe('draining');
     expect(s.energyWh.toFixed(1)).toBe('41.5');
     expect(s.pctPerHour.toFixed(1)).toBe('9.6');
@@ -88,23 +77,28 @@ describe('computeStats + headline', () => {
   });
 
   it('applies charger efficiency', () => {
-    const s = computeStats(telemetry(V62, 10, 0, 50), { ...config, efficiency: 0.9 });
+    const s = computeStats(telemetry(62, 10, 0), { ...config, efficiency: 0.9 });
     expect(s.netW).toBeCloseTo(9);
   });
 
   it('treats tiny net power as balanced', () => {
-    const s = computeStats(telemetry(13.2, 3.15, 3.1, 30), lossless);
+    const s = computeStats(telemetry(70, 3.15, 3.1), lossless);
     expect(s.state).toBe('balanced');
     expect(headline(s, at(12, 0)).title).toBe('Holding steady');
   });
 
-  it('flags fast charging at the threshold', () => {
-    expect(computeStats(telemetry(13.2, 15, 0, 90)).fastCharging).toBe(true);
-    expect(computeStats(telemetry(13.2, 14.9, 0, 90)).fastCharging).toBe(false);
+  it('takes fast charging from the bank flag', () => {
+    expect(computeStats(telemetry(70, 5, 0, { fastCharging: true })).fastCharging).toBe(true);
+    expect(computeStats(telemetry(70, 20, 0)).fastCharging).toBe(false);
+  });
+
+  it('says fully charged when the bank sets the done flag', () => {
+    const s = computeStats(telemetry(98, 9.4, 3.1, { doneCharging: true }), lossless);
+    expect(headline(s, at(14, 14)).title).toBe('Fully charged');
   });
 
   it('adds the weekday when the ETA is more than a day out', () => {
-    const s = computeStats(telemetry(V54, 0, 1, 0), lossless); // ~41 h left
+    const s = computeStats(telemetry(54, 0, 1), lossless); // ~41 h left
     expect(headline(s, at(20, 5)).title).toMatch(/^Lasts until (Sun|Mon|Tue|Wed|Thu|Fri|Sat) /);
   });
 });

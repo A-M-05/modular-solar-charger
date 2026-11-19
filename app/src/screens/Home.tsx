@@ -68,7 +68,6 @@ export default function Home() {
               soc={s.soc}
               energyWh={s.energyWh}
               capacityWh={s.capacityWh}
-              voltage={t.batteryV}
               reduceMotion={reduceMotion}
             />
             <PowerFlow t={t} s={s} />
@@ -78,7 +77,7 @@ export default function Home() {
               history={bank.history}
               forecast={forecast.samples}
               now={bank.now}
-              liveLight={t.lightPct}
+              liveLight={s.lightPct}
               onUseLocation={forecast.status === 'needsLocation' ? forecast.requestLocation : undefined}
             />
           </>
@@ -153,6 +152,12 @@ function DevMenu({ bank, visible, onClose }: { bank: Bank; visible: boolean; onC
                 {bank.scenario === sc && <Text style={styles.sheetText}>{'✓'}</Text>}
               </Pressable>
             ))}
+          {connected && (
+            <View style={styles.sheetRow}>
+              <Text style={styles.sheetText}>Dropped packets</Text>
+              <Text style={styles.sheetText}>{bank.dropped}</Text>
+            </View>
+          )}
           <Pressable
             style={styles.sheetRow}
             onPress={connected ? bank.disconnect : bank.connect}
